@@ -20,7 +20,7 @@ import java.util.List;
 
 /**
  * @goal swank
- * @execute phase="compile"
+ * @execute phase="test-compile"
  * @requiresDependencyResolution test
  */
 public class ClojureSwankMojo extends AbstractClojureCompilerMojo {
@@ -38,11 +38,19 @@ public class ClojureSwankMojo extends AbstractClojureCompilerMojo {
     protected int port;
 
     /**
-     * @parameter expression="${clojure.swank.protocolVersion}"
-     * default-value="2009-09-14"
+     * @parameter expression="${clojure.swank.protocolVersion}" default-value="2009-09-14"
      */
     protected String protocolVersion;
 
+    /**
+     * @parameter expression="${clojure.swank.encoding}" default-value="iso-8859-1"
+     */
+    protected String encoding;
+
+    /**
+     * @parameter expression="${clojure.swank.host}" default-value="localhost"
+     */
+    protected String swankHost;
 
     public void execute() throws MojoExecutionException {
         File swankTempFile;
@@ -54,13 +62,13 @@ public class ClojureSwankMojo extends AbstractClojureCompilerMojo {
 
         StringBuilder sb = new StringBuilder();
         sb.append("(do ");
-        sb.append("(swank.swank/ignore-protocol-version \"");
-        sb.append(protocolVersion);
-        sb.append("\") ");
         sb.append("(swank.swank/start-server \"");
-        sb.append(swankTempFile.getAbsolutePath());
-        sb.append("\" :port ");
+        sb.append(swankTempFile.getAbsolutePath().replace("\\", "/"));
+        sb.append("\"");
+        sb.append(" :host \"").append(swankHost).append("\"");
+        sb.append(" :port ");
         sb.append(Integer.toString(port));
+        sb.append(" :encoding \"").append(encoding).append("\"");
         sb.append(" :dont-close true");
         sb.append("))");
         String swankLoader = sb.toString();

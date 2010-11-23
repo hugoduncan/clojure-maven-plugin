@@ -17,13 +17,13 @@ import org.apache.maven.plugin.logging.Log;
 
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Scanner;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class NamespaceDiscovery {
+
+    private static final String TEMPORARY_FILES_REGEXP = "^(\\.|#).*";
 
     private final Pattern nsPattern = Pattern.compile("^\\s*\\(ns(\\s.*|$)");
     private Log log;
@@ -48,7 +48,7 @@ public class NamespaceDiscovery {
             namespaceFilterRegexs = new String[]{".*"};
         }
 
-        List<NamespaceInFile> namespaces = new ArrayList<NamespaceInFile>();
+        Set<NamespaceInFile> namespaces = new HashSet<NamespaceInFile>();
 
         for (NamespaceInFile namespace : discoverNamespacesInPath(paths)) {
 
@@ -96,7 +96,7 @@ public class NamespaceDiscovery {
         File[] files = scanPath.listFiles();
         if (files != null && files.length != 0) {
             for (File file : files) {
-                if (!file.getName().startsWith(".")) {
+                if (!file.getName().matches(TEMPORARY_FILES_REGEXP)) {
                     log.debug("Searching " + file.getPath() + " for clojure namespaces");
                     if (file.isDirectory()) {
                         namespaces.addAll(discoverNamespacesIn(basePath, file));

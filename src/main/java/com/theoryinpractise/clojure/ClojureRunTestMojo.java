@@ -48,7 +48,7 @@ public class ClojureRunTestMojo extends AbstractClojureCompilerMojo {
             final File[] testSourceDirectories = getSourceDirectories(SourceDirectory.TEST);
             final File[] allSourceDirectories = getSourceDirectories(SourceDirectory.TEST, SourceDirectory.COMPILE);
 
-            if (testScript == null || "".equals(testScript) || !(new File(testScript).exists())) {
+            if (testScript == null || "".equals(testScript)) {
 
                 // Generate test script
 
@@ -63,17 +63,7 @@ public class ClojureRunTestMojo extends AbstractClojureCompilerMojo {
                         writer.println("(require '" + namespace.getName() + ")");
                     }
 
-                    StringWriter testCljWriter = new StringWriter();
-                    copy(ClojureRunTestMojo.class.getResourceAsStream("/default_test_script.clj"), testCljWriter);
-
-                    StringBuilder runTestLine = new StringBuilder();
-                    runTestLine.append("(run-tests");
-                    for (NamespaceInFile namespace : ns) {
-                        runTestLine.append(" '" + namespace.getName());
-                    }
-                    runTestLine.append(")");
-
-                    String testClj = testCljWriter.toString().replace("(run-tests)", runTestLine.toString());
+                    String testClj = generateTestScript(ns);
 
                     writer.println(testClj);
 
@@ -87,13 +77,36 @@ public class ClojureRunTestMojo extends AbstractClojureCompilerMojo {
 
 
                 // throw new MojoExecutionException("testScript is empty or does not exist!");
-            }
+            } else {
+                File testFile = new File(testScript);
 
+                if (!testFile.exists()) {
+                    testFile = new File(getWorkingDirectory(), testScript);
+                }
+
+                if (!(testFile.exists())) {
+		            throw new MojoExecutionException("testScript " + testFile.getPath() + " does not exist.");
+	            }
+            }
 
             getLog().debug("Running clojure:test against " + testScript);
 
             callClojureWith(allSourceDirectories, outputDirectory, testClasspathElements, "clojure.main", new String[]{testScript});
         }
+    }
+
+    protected String generateTestScript(NamespaceInFile[] ns) throws IOException {
+        StringWriter testCljWriter = new StringWriter();
+        copy(ClojureRunTestMojo.class.getResourceAsStream("/default_test_script.clj"), testCljWriter);
+
+        StringBuilder runTestLine = new StringBuilder();
+        runTestLine.append("(run-tests");
+        for (NamespaceInFile namespace : ns) {
+            runTestLine.append(" '" + namespace.getName());
+        }
+        runTestLine.append(")");
+
+        return testCljWriter.toString().replace("(run-tests)", runTestLine.toString());
     }
 
 }

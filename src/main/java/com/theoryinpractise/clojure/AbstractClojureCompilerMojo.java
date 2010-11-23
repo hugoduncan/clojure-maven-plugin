@@ -12,10 +12,8 @@
 
 package com.theoryinpractise.clojure;
 
-import java.io.FileNotFoundException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.apache.commons.exec.*;
+import org.apache.commons.lang.SystemUtils;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
@@ -123,6 +121,13 @@ public abstract class AbstractClojureCompilerMojo extends AbstractMojo {
     protected File generatedSourceDirectory;
 
     /**
+     * Working directory for forked java clojure process.
+     *
+     * @parameter
+     */
+    protected File workingDirectory;
+
+    /**
      * Should we compile all namespaces or only those defined?
      *
      * @parameter default-value="false"
@@ -160,7 +165,7 @@ public abstract class AbstractClojureCompilerMojo extends AbstractMojo {
     /**
      * Clojure/Java command-line options
      *
-     * @parameter
+     * @parameter expression="${clojure.options}"
      */
     private String clojureOptions = "";
 
@@ -201,6 +206,13 @@ public abstract class AbstractClojureCompilerMojo extends AbstractMojo {
      */
     private boolean warnOnReflection;
 
+    /**
+     * Specify additional vmargs to use when running clojure or swank.
+     *
+     * @parameter expression="${clojure.vmargs}"
+     */
+    private String vmargs;
+
     private String getJavaExecutable() throws MojoExecutionException {
 
         Toolchain tc = toolchainManager.getToolchainFromBuildContext("jdk", //NOI18N
@@ -216,6 +228,18 @@ public abstract class AbstractClojureCompilerMojo extends AbstractMojo {
         }
 
         return "java";
+    }
+
+    protected File getWorkingDirectory() throws MojoExecutionException {
+        if (workingDirectory != null) {
+            if (workingDirectory.exists()) {
+                return workingDirectory;
+            } else {
+                throw new MojoExecutionException("Directory specified in <workingDirectory/> does not exists: " + workingDirectory.getPath());
+            }
+        } else {
+            return session.getCurrentProject().getBasedir();
+        }
     }
 
     private File[] translatePaths(String[] paths) {
@@ -296,14 +320,34 @@ public abstract class AbstractClojureCompilerMojo extends AbstractMojo {
             List<String> compileClasspathElements,
             String mainClass,
             NamespaceInFile[] namespaceArgs) throws MojoExecutionException {
+        callClojureWith(ExecutionMode.BATCH, sourceDirectory, outputDirectory, compileClasspathElements, mainClass, namespaceArgs);
+    }
+
+    protected void callClojureWith(
+            File[] sourceDirectory,
+            File outputDirectory,
+            List<String> compileClasspathElements,
+            String mainClass,
+            String[] clojureArgs) throws MojoExecutionException {
+        callClojureWith(ExecutionMode.BATCH, sourceDirectory, outputDirectory, compileClasspathElements, mainClass, clojureArgs);
+    }
+
+    protected void callClojureWith(
+            ExecutionMode executionMode,
+            File[] sourceDirectory,
+            File outputDirectory,
+            List<String> compileClasspathElements,
+            String mainClass,
+            NamespaceInFile[] namespaceArgs) throws MojoExecutionException {
         String[] stringArgs = new String[namespaceArgs.length];
         for (int i = 0; i < namespaceArgs.length; i++) {
             stringArgs[i] = namespaceArgs[i].getName();
         }
-        callClojureWith(sourceDirectory, outputDirectory, compileClasspathElements, mainClass, stringArgs);
+        callClojureWith(executionMode, sourceDirectory, outputDirectory, compileClasspathElements, mainClass, stringArgs);
     }
 
     protected void callClojureWith(
+            ExecutionMode executionMode,
             File[] sourceDirectory,
             File outputDirectory,
             List<String> compileClasspathElements,
@@ -323,14 +367,29 @@ public abstract class AbstractClojureCompilerMojo extends AbstractMojo {
             cp = cp + File.pathSeparator + classpathElement;
         }
 
+        cp = cp.replaceAll("\\s", "\\ ");
+
         final String javaExecutable = getJavaExecutable();
         getLog().debug("Java exectuable used:  " + javaExecutable);
         getLog().debug("Clojure classpath: " + cp);
-        CommandLine cl = new CommandLine(javaExecutable);
+        CommandLine cl = null;
+
+        if (ExecutionMode.INTERACTIVE == executionMode && SystemUtils.IS_OS_WINDOWS) {
+            cl = new CommandLine("cmd");
+            cl.addArgument("/c");
+            cl.addArgument("start");
+            cl.addArgument(javaExecutable);
+        } else {
+            cl = new CommandLine(javaExecutable);
+        }
+
+        if (vmargs != null) {
+            cl.addArguments(vmargs, false);
+        }
 
         cl.addArgument("-cp");
-        cl.addArgument(cp);
-        cl.addArgument("-Dclojure.compile.path=" + outputDirectory.getPath() + "");
+        cl.addArgument(cp, false);
+        cl.addArgument("-Dclojure.compile.path=" + outputDirectory.getPath(), false);
 
         if (warnOnReflection) cl.addArgument("-Dclojure.compile.warn-on-reflection=true");
 
@@ -346,6 +405,8 @@ public abstract class AbstractClojureCompilerMojo extends AbstractMojo {
             cl.addArguments(clojureArgs, false);
         }
 
+        getLog().debug("Command line: " + cl.toString());
+
         Executor exec = new DefaultExecutor();
         Map<String, String> env = new HashMap<String, String>(System.getenv());
 //        env.put("path", ";");
@@ -353,6 +414,7 @@ public abstract class AbstractClojureCompilerMojo extends AbstractMojo {
 
         ExecuteStreamHandler handler = new PumpStreamHandler(System.out, System.err, System.in);
         exec.setStreamHandler(handler);
+        exec.setWorkingDirectory(getWorkingDirectory());
 
         int status;
         try {
