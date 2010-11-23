@@ -43,7 +43,14 @@ public class ClojureAutodocMojo extends AbstractClojureCompilerMojo {
 	 * @parameter expression="${project.build.directory}"
 	 */
 	private String projectBuildDir;
-	
+
+    /**
+     * Location of the source files.
+     *
+     * @parameter
+     */
+    private String[] sourceDirectories = new String[]{"src/main/clojure"};
+
     /**
      * @parameter
      */
@@ -55,7 +62,7 @@ public class ClojureAutodocMojo extends AbstractClojureCompilerMojo {
         effectiveProps.put("description", projectDescription);
         effectiveProps.put("param-dir", "src/main/autodoc");
         effectiveProps.put("root", ".");
-        effectiveProps.put("source-path", "src/main/clojure");
+        effectiveProps.put("source-path", sourceDirectories[0]);
         effectiveProps.put("output-path", new File(projectBuildDir, "autodoc").getAbsolutePath());
         effectiveProps.put("page-title", projectName);
         
