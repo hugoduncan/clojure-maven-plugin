@@ -167,14 +167,20 @@ public class ClojureMarginaliaMojo extends AbstractClojureCompilerMojo {
     // Build the script to run marginalia
     StringBuilder sb = new StringBuilder();
     sb.append("(use 'marginalia.core)\n");
-    sb.append("(use '[marginalia.html :only (uberdoc-html)])\n");
 
     sb.append("(ensure-directory! \"");
     sb.append(marginaliaTargetDirectory);
     sb.append("\")\n");
 
+    sb.append("(uberdoc!\n");
+
+    // Create the output file name
+    sb.append("  \"");
+    sb.append(marginaliaTargetDirectory);
+    sb.append("/uberdoc.html\"\n");
+
     // Create the list of sources to process
-    sb.append("(let [docs (map path-to-doc (format-sources [");
+    sb.append("  (format-sources [");
 
     // Append the explicit marginalia source paths, or project source paths
     for (String entry : (marginaliaSourceDirectories!=null
@@ -186,21 +192,11 @@ public class ClojureMarginaliaMojo extends AbstractClojureCompilerMojo {
       sb.append(entry);
       sb.append("\" ");
     }
+    sb.append("])\n");
 
-    sb.append("]))\n");
-
-    // Create the output file name
-    sb.append("output-file-name \"");
-    sb.append(marginaliaTargetDirectory);
-    sb.append("/uberdoc.html\"\n");
-
-    // Create the output
-    sb.append("source (uberdoc-html ");
-    sb.append("output-file-name ");
+    // and the project map
     sb.append(formatMap(effectiveProps));
-    sb.append(" docs)]\n");
-    // Write the output
-    sb.append("(spit output-file-name source))");
+    sb.append(")\n");
 
     // Run it
     try {
